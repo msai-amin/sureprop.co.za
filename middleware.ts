@@ -55,9 +55,7 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === "/login" || pathname === "/signup") {
     if (session) {
-      const next =
-        request.nextUrl.searchParams.get("next") ??
-        dashboardAccessMap[session.role];
+      const next = request.nextUrl.searchParams.get("next") ?? "/";
       return NextResponse.redirect(new URL(next, request.url));
     }
     return response;

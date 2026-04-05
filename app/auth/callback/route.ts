@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { dashboardAccessMap } from "@/lib/auth/rbac";
 import type { UserRole } from "@/lib/auth/session";
 import { syncUserToDatabase } from "@/lib/auth/sync-profile";
 
@@ -61,10 +60,8 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login?error=sync_failed`);
   }
 
-  const role = synced.session.role;
-  const fallback = dashboardAccessMap[role];
   const destination =
-    next && next.startsWith("/") && !next.startsWith("//") ? next : fallback;
+    next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
 
   return NextResponse.redirect(`${origin}${destination}`);
 }

@@ -3,8 +3,6 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { AlertCircle } from "lucide-react";
-import type { UserRole } from "@/lib/auth/session";
-import { dashboardAccessMap } from "@/lib/auth/rbac";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -51,16 +49,8 @@ export function LoginForm() {
         return;
       }
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      const raw = user?.user_metadata?.app_role;
-      const r = typeof raw === "string" ? raw.toUpperCase() : "";
-      const role: UserRole | null =
-        r && r in dashboardAccessMap ? (r as UserRole) : null;
       const nextParam = searchParams.get("next");
-      const fallback = role ? dashboardAccessMap[role] : "/";
-      router.push(nextParam || fallback);
+      router.push(nextParam || "/");
       router.refresh();
     } finally {
       setPending(false);
