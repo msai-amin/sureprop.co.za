@@ -1,10 +1,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { LoginForm } from "@/components/auth/login-form";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { SupabaseConfigAlert } from "@/components/marketing/supabase-config-alert";
 import { buttonVariants } from "@/lib/button-variants";
 import { cn } from "@/lib/utils";
-import { AlertCircle } from "lucide-react";
 
 export default async function LoginPage({
   searchParams,
@@ -36,23 +35,7 @@ export default async function LoginPage({
         </div>
         <div className="flex flex-col items-center justify-center lg:items-stretch">
           {showSupabaseConfigHint ? (
-            <Alert variant="destructive" className="mb-6 w-full max-w-md">
-              <AlertCircle className="size-4" aria-hidden />
-              <AlertTitle>Supabase env vars missing</AlertTitle>
-              <AlertDescription className="space-y-2">
-                <p>
-                  Add <code className="rounded bg-muted px-1 text-xs">NEXT_PUBLIC_SUPABASE_URL</code>{" "}
-                  and{" "}
-                  <code className="rounded bg-muted px-1 text-xs">
-                    NEXT_PUBLIC_SUPABASE_ANON_KEY
-                  </code>{" "}
-                  to <code className="rounded bg-muted px-1 text-xs">.env.local</code>{" "}
-                  (copy from{" "}
-                  <code className="rounded bg-muted px-1 text-xs">env.example</code>
-                  ), then restart the dev server.
-                </p>
-              </AlertDescription>
-            </Alert>
+            <SupabaseConfigAlert className="mb-6 w-full max-w-md" />
           ) : null}
           <Suspense
             fallback={

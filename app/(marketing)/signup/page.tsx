@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { SignupForm } from "@/components/auth/signup-form";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { SupabaseConfigAlert } from "@/components/marketing/supabase-config-alert";
 import { buttonVariants } from "@/lib/button-variants";
 import { getSupabasePublishableConfig } from "@/lib/supabase/env";
 import { cn } from "@/lib/utils";
@@ -31,30 +31,7 @@ export default function SignupPage() {
         </div>
         <div className="flex flex-col items-center justify-center lg:items-stretch">
           {!supabaseConfig && (
-            <Alert variant="destructive" className="mb-6 text-left">
-              <AlertTitle>Supabase is not configured</AlertTitle>
-              <AlertDescription className="space-y-2">
-                <p>
-                  Add{" "}
-                  <code className="rounded bg-background px-1 py-0.5 text-xs">
-                    NEXT_PUBLIC_SUPABASE_URL
-                  </code>{" "}
-                  and{" "}
-                  <code className="rounded bg-background px-1 py-0.5 text-xs">
-                    NEXT_PUBLIC_SUPABASE_ANON_KEY
-                  </code>{" "}
-                  to{" "}
-                  <code className="rounded bg-background px-1 py-0.5 text-xs">
-                    .env.local
-                  </code>{" "}
-                  (see{" "}
-                  <code className="rounded bg-background px-1 py-0.5 text-xs">
-                    env.example
-                  </code>
-                  ), then restart the dev server.
-                </p>
-              </AlertDescription>
-            </Alert>
+            <SupabaseConfigAlert className="mb-6 w-full max-w-md text-left" />
           )}
           <SignupForm />
           <p className="mt-6 text-center text-sm text-muted-foreground lg:text-left">
