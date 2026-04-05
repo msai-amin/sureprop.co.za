@@ -2,9 +2,21 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import type { UserRole } from "@/lib/auth/session";
 import { dashboardAccessMap } from "@/lib/auth/rbac";
 import { createClient } from "@/lib/supabase/client";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const ROLES: UserRole[] = ["BUYER", "AGENT", "LAWYER", "BOND", "ADMIN"];
 
@@ -63,69 +75,84 @@ export function SignupForm() {
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-zinc-200 p-6 dark:border-zinc-800"
-    >
-      <h2 className="text-lg font-semibold">Create account</h2>
-      <p className="text-xs text-zinc-500">
-        Role is stored as <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">app_role</code>{" "}
-        metadata. Production should restrict roles (e.g. agents verified by admin).
-      </p>
-      {error ? (
-        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {info ? (
-        <p className="text-sm text-green-700 dark:text-green-400" role="status">
-          {info}
-        </p>
-      ) : null}
-      <label className="flex flex-col gap-1 text-sm">
-        Role
-        <select
-          value={appRole}
-          onChange={(e) => setAppRole(e.target.value as UserRole)}
-          className="rounded border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-900"
-        >
-          {ROLES.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Email
-        <input
-          type="email"
-          autoComplete="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="rounded border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-900"
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Password
-        <input
-          type="password"
-          autoComplete="new-password"
-          required
-          minLength={8}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="rounded border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-900"
-        />
-      </label>
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
-      >
-        {pending ? "Creating…" : "Sign up"}
-      </button>
-    </form>
+    <Card className="w-full max-w-md border-border/80 shadow-md motion-reduce:shadow-none">
+      <CardHeader>
+        <CardTitle>Create account</CardTitle>
+        <CardDescription>
+          Choose your primary role. In production, restrict elevated roles with
+          admin verification.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={onSubmit} className="flex flex-col gap-5">
+          {error ? (
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" aria-hidden />
+              <AlertTitle>Sign up failed</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+          {info ? (
+            <Alert>
+              <CheckCircle2 className="size-4 text-primary" aria-hidden />
+              <AlertTitle>Confirm your email</AlertTitle>
+              <AlertDescription>{info}</AlertDescription>
+            </Alert>
+          ) : null}
+          <div className="space-y-2">
+            <Label id="role-label">Role</Label>
+            <div
+              className="grid grid-cols-2 gap-2 sm:grid-cols-3"
+              role="group"
+              aria-labelledby="role-label"
+            >
+              {ROLES.map((r) => (
+                <Button
+                  key={r}
+                  type="button"
+                  variant={appRole === r ? "default" : "outline"}
+                  size="sm"
+                  className="justify-center font-medium"
+                  onClick={() => setAppRole(r)}
+                  aria-pressed={appRole === r}
+                >
+                  {r.charAt(0) + r.slice(1).toLowerCase()}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="signup-email">Email</Label>
+            <Input
+              id="signup-email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="signup-password">Password</Label>
+            <Input
+              id="signup-password"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Minimum 8 characters. Use a unique passphrase for production
+              accounts.
+            </p>
+          </div>
+          <Button type="submit" className="w-full" disabled={pending}>
+            {pending ? "Creating…" : "Create account"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

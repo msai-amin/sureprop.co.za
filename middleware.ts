@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { authSessionFromSupabaseUser } from "@/lib/auth/session";
 import { dashboardAccessMap } from "@/lib/auth/rbac";
+import { getSupabasePublishableConfig } from "@/lib/supabase/env";
 import { createSupabaseMiddlewareClient } from "@/lib/supabase/middleware";
 
 const dashboardPathToRole = {
@@ -11,13 +12,32 @@ const dashboardPathToRole = {
 } as const;
 
 export async function middleware(request: NextRequest) {
-  const { supabase, response } = createSupabaseMiddlewareClient(request);
+  const { pathname } = request.nextUrl;
+
+  const publishable = getSupabasePublishableConfig();
+
+  if (!publishable) {
+    const dashboardRoot = Object.keys(dashboardPathToRole).find(
+      (path) => pathname === path || pathname.startsWith(`${path}/`),
+    );
+    if (dashboardRoot) {
+      const login = new URL("/login", request.url);
+      login.searchParams.set("config", "supabase");
+      login.searchParams.set("next", pathname);
+      return NextResponse.redirect(login);
+    }
+    return NextResponse.next();
+  }
+
+  const { supabase, response } = createSupabaseMiddlewareClient(
+    request,
+    publishable,
+  );
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
   const session = user ? authSessionFromSupabaseUser(user) : null;
 
   if (pathname === "/login" || pathname === "/signup") {
