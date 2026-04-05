@@ -10,7 +10,8 @@
     "lint": "eslint",
     "check": "npm run lint && npx tsc --noEmit",
     "check:env": "node scripts/check-env.mjs",
-    "deploy:vercel": "vercel deploy --prod --yes"
+    "deploy:vercel": "vercel deploy --prod --yes",
+    "vercel:git:main": "vercel git connect https://github.com/msai-amin/sureprop.co.za.git"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
