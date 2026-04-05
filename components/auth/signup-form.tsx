@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 
 const ROLES: UserRole[] = ["BUYER", "AGENT", "LAWYER", "BOND", "ADMIN"];
 
@@ -119,6 +121,15 @@ export function SignupForm() {
                   {r.charAt(0) + r.slice(1).toLowerCase()}
                 </Button>
               ))}
+            </div>
+          </div>
+          <div className="space-y-3">
+            <GoogleAuthButton mode="signup" appRole={appRole} />
+            <div className="relative">
+              <Separator />
+              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
+                or email
+              </span>
             </div>
           </div>
           <div className="space-y-2">

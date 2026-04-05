@@ -14,6 +14,19 @@ const dashboardPathToRole = {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Email confirmation / OAuth sometimes lands on Site URL with ?code= (root).
+  // Always exchange via /auth/callback so PKCE succeeds.
+  if (pathname === "/" && request.nextUrl.searchParams.has("code")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/callback";
+    return NextResponse.redirect(url);
+  }
+
+  // Marketing home: avoid running Supabase on every visit.
+  if (pathname === "/") {
+    return NextResponse.next();
+  }
+
   const publishable = getSupabasePublishableConfig();
 
   if (!publishable) {
@@ -77,6 +90,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/",
     "/login",
     "/signup",
     "/agent/:path*",

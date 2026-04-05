@@ -44,3 +44,4 @@ next-env.d.ts
 
 # Supabase CLI ephemeral files (may contain connection hints)
 supabase/.temp/
+.env*.local

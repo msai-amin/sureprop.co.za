@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import type { UserRole as PrismaUserRole } from "@/app/generated/prisma/enums";
 import { getAuthSession } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { prisma } from "@/lib/db/client";
+import { syncUserToDatabase } from "@/lib/auth/sync-profile";
 
 /**
  * Upserts `public.User` to match `auth.users` after sign-in/sign-up.
@@ -22,36 +21,27 @@ export async function POST() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user?.email) {
+  if (!user) {
     return NextResponse.json(
-      { error: "BadRequest", message: "User email missing." },
+      { error: "BadRequest", message: "User not found." },
       { status: 400 },
     );
   }
 
-  try {
-    await prisma.user.upsert({
-      where: { id: session.userId },
-      create: {
-        id: session.userId,
-        email: user.email,
-        role: session.role as PrismaUserRole,
-        fullName:
-          typeof user.user_metadata?.full_name === "string"
-            ? user.user_metadata.full_name
-            : null,
-      },
-      update: {
-        email: user.email,
-        role: session.role as PrismaUserRole,
-      },
-    });
+  const result = await syncUserToDatabase(user);
 
-    return NextResponse.json({ ok: true });
-  } catch {
+  if (!result.ok) {
+    const message =
+      result.reason === "no_app_role"
+        ? "Missing app_role in user metadata."
+        : result.reason === "no_email"
+          ? "User email missing."
+          : "Failed to sync user profile.";
     return NextResponse.json(
-      { error: "InternalError", message: "Failed to sync user profile." },
-      { status: 500 },
+      { error: "BadRequest", message },
+      { status: 400 },
     );
   }
+
+  return NextResponse.json({ ok: true });
 }
