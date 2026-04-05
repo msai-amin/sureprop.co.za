@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { getSupabasePublishableConfig } from "@/lib/supabase/env";
 
 export type UserRole = "BUYER" | "AGENT" | "LAWYER" | "BOND" | "ADMIN";
 
@@ -48,6 +49,10 @@ export async function getAuthSession(request?: Request): Promise<AuthSession | n
   if (process.env.AUTH_HEADER_FALLBACK === "true" && request) {
     const fallback = getSessionFromHeaders(request.headers);
     if (fallback) return fallback;
+  }
+
+  if (!getSupabasePublishableConfig()) {
+    return null;
   }
 
   const supabase = await createClient();
