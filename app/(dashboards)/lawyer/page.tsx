@@ -27,7 +27,7 @@ export default async function LawyerDashboardPage() {
         </h1>
         <p className="text-sm text-muted-foreground">
           Document metadata for POPIA-minded workflows. Storage integration uses
-          signed URLs (stub in development).
+          signed URLs for direct uploads.
           {session.role === "ADMIN"
             ? " Admin view: all vault rows."
             : " Your registered files only."}

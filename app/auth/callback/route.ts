@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import type { UserRole } from "@/lib/auth/session";
 import { syncUserToDatabase } from "@/lib/auth/sync-profile";
 
-const VALID_ROLES: UserRole[] = ["BUYER", "AGENT", "LAWYER", "BOND", "ADMIN"];
+const SIGNUP_DEFAULT_ROLE = "BUYER" as const;
 
 /**
  * PKCE / email-confirm / OAuth return URL. Add to Supabase:
@@ -34,12 +33,12 @@ export async function GET(request: Request) {
 
   const cookieStore = await cookies();
   const pending = cookieStore.get("sp_pending_role")?.value?.toUpperCase();
-  if (pending && VALID_ROLES.includes(pending as UserRole)) {
+  if (pending === SIGNUP_DEFAULT_ROLE) {
     await supabase.auth.updateUser({
-      data: { app_role: pending },
+      data: { app_role: SIGNUP_DEFAULT_ROLE },
     });
-    cookieStore.delete("sp_pending_role");
   }
+  cookieStore.delete("sp_pending_role");
 
   const {
     data: { user },

@@ -60,8 +60,8 @@ export function DocumentRegisterForm() {
     e.currentTarget.reset();
     setInfo(
       data.uploadUrl?.url
-        ? "Metadata saved. Use the signed upload target in production storage."
-        : "Document metadata recorded (stub upload URL in dev).",
+        ? "Metadata saved. Signed upload URL generated."
+        : "Document metadata recorded.",
     );
     router.refresh();
     setPending(false);
@@ -72,8 +72,7 @@ export function DocumentRegisterForm() {
       <CardHeader>
         <CardTitle className="text-lg">Register document</CardTitle>
         <CardDescription>
-          Creates encrypted vault metadata and returns a signed upload stub for
-          integration testing.
+          Creates encrypted vault metadata and returns a signed upload URL.
         </CardDescription>
       </CardHeader>
       <CardContent>

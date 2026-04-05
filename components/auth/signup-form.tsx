@@ -3,8 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
-import type { UserRole } from "@/lib/auth/session";
-import { dashboardAccessMap } from "@/lib/auth/rbac";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -19,14 +17,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
-
-const ROLES: UserRole[] = ["BUYER", "AGENT", "LAWYER", "BOND", "ADMIN"];
+const SIGNUP_DEFAULT_ROLE = "BUYER" as const;
 
 export function SignupForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [appRole, setAppRole] = useState<UserRole>("BUYER");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -43,7 +39,7 @@ export function SignupForm() {
         email,
         password,
         options: {
-          data: { app_role: appRole },
+          data: { app_role: SIGNUP_DEFAULT_ROLE },
           emailRedirectTo: `${origin}/auth/callback`,
         },
       });
@@ -69,7 +65,7 @@ export function SignupForm() {
         return;
       }
 
-      router.push(dashboardAccessMap[appRole]);
+      router.push("/");
       router.refresh();
     } finally {
       setPending(false);
@@ -81,8 +77,8 @@ export function SignupForm() {
       <CardHeader>
         <CardTitle>Create account</CardTitle>
         <CardDescription>
-          Choose your primary role. In production, restrict elevated roles with
-          admin verification.
+          New self-signups are created as buyers. Agents, lawyers, and bond
+          originators are granted by admin verification.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -101,30 +97,8 @@ export function SignupForm() {
               <AlertDescription>{info}</AlertDescription>
             </Alert>
           ) : null}
-          <div className="space-y-2">
-            <Label id="role-label">Role</Label>
-            <div
-              className="grid grid-cols-2 gap-2 sm:grid-cols-3"
-              role="group"
-              aria-labelledby="role-label"
-            >
-              {ROLES.map((r) => (
-                <Button
-                  key={r}
-                  type="button"
-                  variant={appRole === r ? "default" : "outline"}
-                  size="sm"
-                  className="justify-center font-medium"
-                  onClick={() => setAppRole(r)}
-                  aria-pressed={appRole === r}
-                >
-                  {r.charAt(0) + r.slice(1).toLowerCase()}
-                </Button>
-              ))}
-            </div>
-          </div>
           <div className="space-y-3">
-            <GoogleAuthButton mode="signup" appRole={appRole} />
+            <GoogleAuthButton mode="signup" />
             <div className="relative">
               <Separator />
               <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">

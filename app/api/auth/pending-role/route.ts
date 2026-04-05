@@ -1,27 +1,15 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import type { UserRole } from "@/lib/auth/session";
 
-const VALID: UserRole[] = ["BUYER", "AGENT", "LAWYER", "BOND", "ADMIN"];
+const SIGNUP_DEFAULT_ROLE = "BUYER" as const;
 
 /**
- * Stores chosen signup role in a short-lived cookie before OAuth redirect.
+ * Stores default signup role before OAuth redirect.
+ * Self-signup is locked to BUYER; elevated roles are admin-assigned only.
  */
-export async function POST(request: Request) {
-  let body: { role?: string };
-  try {
-    body = (await request.json()) as { role?: string };
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const role = body.role?.toUpperCase() as UserRole | undefined;
-  if (!role || !VALID.includes(role)) {
-    return NextResponse.json({ error: "Invalid role" }, { status: 400 });
-  }
-
+export async function POST() {
   const cookieStore = await cookies();
-  cookieStore.set("sp_pending_role", role, {
+  cookieStore.set("sp_pending_role", SIGNUP_DEFAULT_ROLE, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
