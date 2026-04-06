@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/lib/button-variants";
+import { createClient } from "@/lib/supabase/server";
+import { getSupabasePublishableConfig } from "@/lib/supabase/env";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +17,78 @@ const filterChips = [
   "Apartment",
 ] as const;
 
-export default function PublicPropertySearchPage() {
+type SearchParams = Promise<{ q?: string }>;
+
+function toStringValue(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function displayLocation(location: unknown): string {
+  if (!location || typeof location !== "object") return "South Africa";
+  const value = location as Record<string, unknown>;
+  const parts = [
+    toStringValue(value.address),
+    toStringValue(value.suburb),
+    toStringValue(value.city),
+    toStringValue(value.province),
+    toStringValue(value.country),
+  ].filter((part): part is string => Boolean(part));
+  return parts.length ? parts.join(", ") : "South Africa";
+}
+
+function displayFeatureNumber(features: unknown, key: string): number | null {
+  if (!features || typeof features !== "object") return null;
+  const value = (features as Record<string, unknown>)[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+export default async function PublicPropertySearchPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const params = await searchParams;
+  const q = params.q?.trim() ?? "";
+  const hasSupabase = Boolean(getSupabasePublishableConfig());
+  let properties: Array<{
+    id: string;
+    title: string;
+    price: string | number;
+    location: unknown;
+    features: unknown;
+    createdAt: string;
+  }> = [];
+  let loadFailed = false;
+
+  if (hasSupabase) {
+    try {
+      const supabase = await createClient();
+      let query = supabase
+        .from("Property")
+        .select("id,title,price,location,features,createdAt")
+        .eq("status", "ACTIVE")
+        .order("createdAt", { ascending: false })
+        .limit(60);
+
+      if (q.length > 0) {
+        query = query.or(
+          `title.ilike.%${q}%,location->>suburb.ilike.%${q}%,location->>city.ilike.%${q}%,location->>address.ilike.%${q}%`,
+        );
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        loadFailed = true;
+      } else {
+        properties = (data ?? []) as typeof properties;
+      }
+    } catch {
+      loadFailed = true;
+    }
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
       <div className="max-w-2xl">
@@ -51,6 +124,7 @@ export default function PublicPropertySearchPage() {
                 id="q"
                 name="q"
                 type="search"
+                defaultValue={q}
                 placeholder="e.g. Claremont, Sea Point, Sandton…"
                 className="pl-10 h-11"
                 autoComplete="off"
@@ -93,24 +167,71 @@ export default function PublicPropertySearchPage() {
         </form>
       </div>
 
-      <div className="mt-12 rounded-lg border border-dashed border-border bg-muted/20 px-6 py-14 text-center">
-        <p className="text-sm font-medium text-foreground">
-          No listings to display yet
-        </p>
-        <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-          Connect your agent feed or seed properties from the agent dashboard.
-          Buyers will see results here once data is available.
-        </p>
-        <Link
-          href="/signup"
-          className={cn(
-            buttonVariants({ variant: "secondary" }),
-            "mt-6 inline-flex",
-          )}
-        >
-          Create an account
-        </Link>
-      </div>
+      {!hasSupabase ? (
+        <div className="mt-12 rounded-lg border border-dashed border-border bg-muted/20 px-6 py-14 text-center">
+          <p className="text-sm font-medium text-foreground">
+            Listings are unavailable right now
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+            Supabase environment variables are missing for this deployment.
+          </p>
+        </div>
+      ) : loadFailed ? (
+        <div className="mt-12 rounded-lg border border-dashed border-border bg-muted/20 px-6 py-14 text-center">
+          <p className="text-sm font-medium text-foreground">
+            We could not load listings
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+            Please refresh and try again.
+          </p>
+        </div>
+      ) : properties.length === 0 ? (
+        <div className="mt-12 rounded-lg border border-dashed border-border bg-muted/20 px-6 py-14 text-center">
+          <p className="text-sm font-medium text-foreground">
+            No listings found
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+            Try a different keyword or clear the search.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {properties.map((property) => {
+            const bedrooms = displayFeatureNumber(property.features, "bedrooms");
+            const bathrooms = displayFeatureNumber(
+              property.features,
+              "bathrooms",
+            );
+            const parking = displayFeatureNumber(property.features, "parking");
+
+            return (
+              <article
+                key={property.id}
+                className="rounded-xl border border-border bg-card p-5 shadow-sm"
+              >
+                <h2 className="line-clamp-2 text-base font-semibold leading-tight">
+                  {property.title}
+                </h2>
+                <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+                  {displayLocation(property.location)}
+                </p>
+                <p className="mt-4 text-xl font-semibold tabular-nums">
+                  R{" "}
+                  {Number(property.price).toLocaleString("en-ZA", {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                  })}
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {[bedrooms ? `${bedrooms} bed` : null, bathrooms ? `${bathrooms} bath` : null, parking ? `${parking} parking` : null]
+                    .filter((item): item is string => Boolean(item))
+                    .join(" • ") || "Details coming soon"}
+                </p>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
