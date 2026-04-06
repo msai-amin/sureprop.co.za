@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,16 @@ const filterChips = [
 ] as const;
 
 type SearchParams = Promise<{ q?: string }>;
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://sureprop.co.za";
+
+export const metadata: Metadata = {
+  title: "Property search",
+  description:
+    "Browse active South African property listings on SureProp. Discover homes, apartments, and land from verified agents.",
+  alternates: {
+    canonical: `${SITE_URL}/search`,
+  },
+};
 
 function toStringValue(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0
@@ -42,6 +53,10 @@ function displayFeatureNumber(features: unknown, key: string): number | null {
   if (!features || typeof features !== "object") return null;
   const value = (features as Record<string, unknown>)[key];
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function toSupabaseLikeTerm(raw: string): string {
+  return raw.replace(/[,%()]/g, " ").trim();
 }
 
 export default async function PublicPropertySearchPage({
@@ -73,8 +88,9 @@ export default async function PublicPropertySearchPage({
         .limit(60);
 
       if (q.length > 0) {
+        const safeQ = toSupabaseLikeTerm(q);
         query = query.or(
-          `title.ilike.%${q}%,location->>suburb.ilike.%${q}%,location->>city.ilike.%${q}%,location->>address.ilike.%${q}%`,
+          `title.ilike.%${safeQ}%,location->>suburb.ilike.%${safeQ}%,location->>city.ilike.%${safeQ}%,location->>address.ilike.%${safeQ}%`,
         );
       }
 
@@ -210,7 +226,12 @@ export default async function PublicPropertySearchPage({
                 className="rounded-xl border border-border bg-card p-5 shadow-sm"
               >
                 <h2 className="line-clamp-2 text-base font-semibold leading-tight">
-                  {property.title}
+                  <Link
+                    href={`/listings/${property.id}`}
+                    className="hover:underline underline-offset-4"
+                  >
+                    {property.title}
+                  </Link>
                 </h2>
                 <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
                   {displayLocation(property.location)}
@@ -227,6 +248,12 @@ export default async function PublicPropertySearchPage({
                     .filter((item): item is string => Boolean(item))
                     .join(" • ") || "Details coming soon"}
                 </p>
+                <Link
+                  href={`/listings/${property.id}`}
+                  className="mt-4 inline-block text-sm font-medium text-primary hover:underline underline-offset-4"
+                >
+                  View listing
+                </Link>
               </article>
             );
           })}
