@@ -1,5 +1,5 @@
 -- SureProp baseline RLS policies
--- Apply in Supabase SQL Editor after running Prisma migrations.
+-- Apply in Supabase SQL Editor after 000_schema.sql.
 
 begin;
 
