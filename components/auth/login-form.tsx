@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -19,7 +19,6 @@ import { Separator } from "@/components/ui/separator";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 
 export function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const queryError = searchParams.get("error");
   const authCallbackError = searchParams.get("auth_error");
@@ -43,15 +42,45 @@ export function LoginForm() {
         return;
       }
 
-      const sync = await fetch("/api/auth/sync-user", { method: "POST" });
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        setError(
+          "Signed in but the session was not stored. Try again or check browser cookie settings.",
+        );
+        return;
+      }
+
+      let sync: Response;
+      try {
+        sync = await fetch("/api/auth/sync-user", {
+          method: "POST",
+          credentials: "same-origin",
+          signal: AbortSignal.timeout(25_000),
+        });
+      } catch (err) {
+        const name = err instanceof Error ? err.name : "";
+        if (name === "TimeoutError" || name === "AbortError") {
+          setError(
+            "Profile sync timed out. Check your connection, then try again.",
+          );
+          return;
+        }
+        throw err;
+      }
+
       if (!sync.ok) {
         setError("Signed in but profile sync failed. Check app_role metadata.");
         return;
       }
 
       const nextParam = searchParams.get("next");
-      router.push(nextParam || "/");
-      router.refresh();
+      const destination =
+        nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
+          ? nextParam
+          : "/";
+      window.location.assign(destination);
     } finally {
       setPending(false);
     }

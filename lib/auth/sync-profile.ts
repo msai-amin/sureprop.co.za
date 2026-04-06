@@ -17,6 +17,7 @@ export async function syncUserToDatabase(user: User) {
 
   try {
     const supabase = await createClient();
+    const now = new Date().toISOString();
     const { error } = await supabase.from("User").upsert(
       {
         id: session.userId,
@@ -26,6 +27,7 @@ export async function syncUserToDatabase(user: User) {
           typeof user.user_metadata?.full_name === "string"
             ? user.user_metadata.full_name
             : null,
+        updatedAt: now,
       },
       { onConflict: "id" },
     );

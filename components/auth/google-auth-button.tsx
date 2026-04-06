@@ -39,10 +39,10 @@ export function GoogleAuthButton({ mode }: Props) {
 
       if (oauthError) {
         setError(oauthError.message);
-        setPending(false);
       }
     } catch {
       setError("Something went wrong.");
+    } finally {
       setPending(false);
     }
   }

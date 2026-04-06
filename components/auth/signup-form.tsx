@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -20,7 +19,6 @@ import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 const SIGNUP_DEFAULT_ROLE = "BUYER" as const;
 
 export function SignupForm() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -59,14 +57,27 @@ export function SignupForm() {
         return;
       }
 
-      const sync = await fetch("/api/auth/sync-user", { method: "POST" });
+      let sync: Response;
+      try {
+        sync = await fetch("/api/auth/sync-user", {
+          method: "POST",
+          credentials: "same-origin",
+          signal: AbortSignal.timeout(25_000),
+        });
+      } catch (err) {
+        const name = err instanceof Error ? err.name : "";
+        if (name === "TimeoutError" || name === "AbortError") {
+          setError("Profile sync timed out. Check your connection, then try again.");
+          return;
+        }
+        throw err;
+      }
       if (!sync.ok) {
         setError("Account created but profile sync failed.");
         return;
       }
 
-      router.push("/");
-      router.refresh();
+      window.location.assign("/");
     } finally {
       setPending(false);
     }

@@ -35,6 +35,11 @@ with check (
   or public.current_app_role() = 'ADMIN'
 );
 
+drop policy if exists user_insert_self on public."User";
+create policy user_insert_self
+on public."User" for insert
+with check (auth.uid() = "id");
+
 -- PROPERTY
 alter table public."Property" enable row level security;
 
