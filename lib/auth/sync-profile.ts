@@ -1,7 +1,6 @@
 import type { User } from "@supabase/supabase-js";
-import type { UserRole as PrismaUserRole } from "@/app/generated/prisma/enums";
-import { prisma } from "@/lib/db/client";
 import { authSessionFromSupabaseUser } from "@/lib/auth/session";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * Upserts `public.User` from Supabase Auth user (requires `app_role` metadata).
@@ -17,22 +16,22 @@ export async function syncUserToDatabase(user: User) {
   }
 
   try {
-    await prisma.user.upsert({
-      where: { id: session.userId },
-      create: {
+    const supabase = await createClient();
+    const { error } = await supabase.from("User").upsert(
+      {
         id: session.userId,
         email: user.email,
-        role: session.role as PrismaUserRole,
+        role: session.role,
         fullName:
           typeof user.user_metadata?.full_name === "string"
             ? user.user_metadata.full_name
             : null,
       },
-      update: {
-        email: user.email,
-        role: session.role as PrismaUserRole,
-      },
-    });
+      { onConflict: "id" },
+    );
+    if (error) {
+      return { ok: false as const, reason: "db_error" as const };
+    }
     return { ok: true as const, session };
   } catch {
     return { ok: false as const, reason: "db_error" as const };

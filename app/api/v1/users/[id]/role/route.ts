@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { ZodError, z } from "zod";
 import { badRequestFromZod } from "@/lib/api/validation";
 import { requireRoles } from "@/lib/auth/guards";
-import { prisma } from "@/lib/db/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const updateUserRoleSchema = z.object({
@@ -22,19 +21,22 @@ export async function PATCH(
     const parsed = updateUserRoleSchema.parse(body);
     const { id } = await context.params;
 
-    const existing = await prisma.user.findUnique({
-      where: { id },
-      select: { id: true, role: true },
-    });
+    const adminClient = createAdminClient();
 
-    if (!existing) {
+    const { data: existingUser, error: existingError } = await adminClient
+      .from("User")
+      .select("id,email")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+    if (!existingUser) {
       return NextResponse.json(
         { error: "NotFound", message: "User not found." },
         { status: 404 },
       );
     }
 
-    const adminClient = createAdminClient();
     const { data: authUserData, error: fetchError } =
       await adminClient.auth.admin.getUserById(id);
     if (fetchError || !authUserData?.user) {
@@ -65,21 +67,19 @@ export async function PATCH(
       );
     }
 
-    const updated = await prisma.user.update({
-      where: { id },
-      data: {
+    const { data: updated, error: updateDbError } = await adminClient
+      .from("User")
+      .update({
         role: parsed.role,
         ...(parsed.verificationStatus
           ? { verificationStatus: parsed.verificationStatus }
           : {}),
-      },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        verificationStatus: true,
-      },
-    });
+      })
+      .eq("id", id)
+      .select("id,email,role,verificationStatus")
+      .single();
+
+    if (updateDbError || !updated) throw updateDbError;
 
     return NextResponse.json({ data: updated });
   } catch (error) {

@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { ZodError, z } from "zod";
-import type { Prisma } from "@/app/generated/prisma/client";
 import { badRequestFromZod } from "@/lib/api/validation";
 import { requireRoles } from "@/lib/auth/guards";
-import { prisma } from "@/lib/db/client";
 import { writeAuditEvent } from "@/lib/security/audit";
+import { createClient } from "@/lib/supabase/server";
 
 const propertyStatusSchema = z.enum(["ACTIVE", "SOLD", "UNDER_OFFER"]);
 
@@ -26,30 +25,25 @@ export async function GET(request: Request) {
   const status = url.searchParams.get("status");
 
   try {
-    const where = {
-      ...(auth.session.role === "ADMIN" ? {} : { agentId: auth.session.userId }),
-      ...(status ? { status: status as "ACTIVE" | "SOLD" | "UNDER_OFFER" } : {}),
-    };
+    const supabase = await createClient();
+    let query = supabase
+      .from("Property")
+      .select("id,title,price,location,features,status,agentId,createdAt,updatedAt")
+      .order("createdAt", { ascending: false })
+      .limit(Number.isNaN(limit) ? 50 : limit);
 
-    const properties = await prisma.property.findMany({
-      where,
-      take: Number.isNaN(limit) ? 50 : limit,
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        title: true,
-        price: true,
-        location: true,
-        features: true,
-        status: true,
-        agentId: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    if (auth.session.role !== "ADMIN") {
+      query = query.eq("agentId", auth.session.userId);
+    }
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    const { data: properties, error } = await query;
+    if (error) throw error;
 
     return NextResponse.json({
-      data: properties,
+      data: properties ?? [],
       accessScope: auth.session.role,
     });
   } catch {
@@ -72,26 +66,21 @@ export async function POST(request: Request) {
         ? parsed.agentId ?? auth.session.userId
         : auth.session.userId;
 
-    const property = await prisma.property.create({
-      data: {
+    const supabase = await createClient();
+    const { data: property, error } = await supabase
+      .from("Property")
+      .insert({
         agentId,
         title: parsed.title,
         price: parsed.price,
-        location: parsed.location as Prisma.InputJsonValue,
-        features: (parsed.features ?? {}) as Prisma.InputJsonValue,
+        location: parsed.location,
+        features: parsed.features ?? {},
         status: parsed.status ?? "ACTIVE",
-      },
-      select: {
-        id: true,
-        title: true,
-        price: true,
-        location: true,
-        features: true,
-        status: true,
-        agentId: true,
-        createdAt: true,
-      },
-    });
+      })
+      .select("id,title,price,location,features,status,agentId,createdAt")
+      .single();
+
+    if (error || !property) throw error;
 
     await writeAuditEvent({
       actorUserId: auth.session.userId,

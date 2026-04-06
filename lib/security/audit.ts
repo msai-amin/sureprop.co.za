@@ -1,5 +1,4 @@
-import type { Prisma } from "@/app/generated/prisma/client";
-import { prisma } from "@/lib/db/client";
+import { createClient } from "@/lib/supabase/server";
 
 type AuditEvent = {
   actorUserId: string;
@@ -11,15 +10,15 @@ type AuditEvent = {
 
 export async function writeAuditEvent(event: AuditEvent) {
   try {
-    await prisma.auditLog.create({
-      data: {
+    const supabase = await createClient();
+    const { error } = await supabase.from("AuditLog").insert({
         actorUserId: event.actorUserId,
         action: event.action,
         resourceType: event.resourceType,
         resourceId: event.resourceId,
-        metadata: event.metadata as Prisma.InputJsonValue | undefined,
-      },
+        metadata: event.metadata ?? null,
     });
+    if (error) throw error;
   } catch {
     // Keep request flow resilient if audit persistence is temporarily unavailable.
     console.info("[AUDIT_FALLBACK]", {

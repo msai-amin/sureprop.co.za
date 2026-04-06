@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { ZodError, z } from "zod";
 import { requireRoles } from "@/lib/auth/guards";
 import { badRequestFromZod } from "@/lib/api/validation";
-import { prisma } from "@/lib/db/client";
 import { writeAuditEvent } from "@/lib/security/audit";
+import { createClient } from "@/lib/supabase/server";
 
 const createLeadSchema = z.object({
   propertyId: z.uuid(),
@@ -18,29 +18,23 @@ export async function GET(request: Request) {
   const limit = Math.min(Number(url.searchParams.get("limit") ?? "50"), 100);
 
   try {
-    const where =
-      auth.session.role === "ADMIN"
-        ? {}
-        : auth.session.role === "AGENT"
-          ? { agentId: auth.session.userId }
-          : { buyerId: auth.session.userId };
+    const supabase = await createClient();
+    let query = supabase
+      .from("Lead")
+      .select("id,status,createdAt,updatedAt,propertyId,buyerId,agentId")
+      .order("createdAt", { ascending: false })
+      .limit(Number.isNaN(limit) ? 50 : limit);
 
-    const leads = await prisma.lead.findMany({
-      where,
-      take: Number.isNaN(limit) ? 50 : limit,
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-        propertyId: true,
-        buyerId: true,
-        agentId: true,
-      },
-    });
+    if (auth.session.role === "AGENT") {
+      query = query.eq("agentId", auth.session.userId);
+    } else if (auth.session.role === "BUYER") {
+      query = query.eq("buyerId", auth.session.userId);
+    }
 
-    return NextResponse.json({ data: leads, accessScope: auth.session.role });
+    const { data: leads, error } = await query;
+    if (error) throw error;
+
+    return NextResponse.json({ data: leads ?? [], accessScope: auth.session.role });
   } catch {
     return NextResponse.json(
       { error: "InternalError", message: "Failed to fetch leads." },
@@ -56,12 +50,15 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const parsed = createLeadSchema.parse(body);
+    const supabase = await createClient();
 
-    const property = await prisma.property.findUnique({
-      where: { id: parsed.propertyId },
-      select: { id: true, agentId: true, status: true },
-    });
+    const { data: property, error: propertyError } = await supabase
+      .from("Property")
+      .select("id,agentId,status")
+      .eq("id", parsed.propertyId)
+      .maybeSingle();
 
+    if (propertyError) throw propertyError;
     if (!property || property.status !== "ACTIVE") {
       return NextResponse.json(
         { error: "NotFound", message: "Active property not found." },
@@ -74,21 +71,17 @@ export async function POST(request: Request) {
         ? parsed.buyerId ?? auth.session.userId
         : auth.session.userId;
 
-    const lead = await prisma.lead.create({
-      data: {
+    const { data: lead, error: insertError } = await supabase
+      .from("Lead")
+      .insert({
         propertyId: property.id,
         agentId: property.agentId,
         buyerId,
-      },
-      select: {
-        id: true,
-        status: true,
-        propertyId: true,
-        buyerId: true,
-        agentId: true,
-        createdAt: true,
-      },
-    });
+      })
+      .select("id,status,propertyId,buyerId,agentId,createdAt")
+      .single();
+
+    if (insertError || !lead) throw insertError;
 
     await writeAuditEvent({
       actorUserId: auth.session.userId,

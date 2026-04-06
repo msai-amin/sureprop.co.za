@@ -40,8 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-/app/generated/prisma
-
 # Supabase CLI ephemeral files (may contain connection hints)
 supabase/.temp/
 .env*.local

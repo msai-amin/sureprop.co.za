@@ -86,9 +86,8 @@ export function LoginForm() {
               <AlertCircle className="size-4" aria-hidden />
               <AlertTitle>Could not save profile</AlertTitle>
               <AlertDescription>
-                Try again. If it persists, confirm{" "}
-                <code className="rounded bg-muted px-1 text-xs">DATABASE_URL</code>{" "}
-                on the server.
+                Try again. If it persists, confirm Supabase table access and
+                RLS policies for profile sync.
               </AlertDescription>
             </Alert>
           ) : null}

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth/guards";
-import { prisma } from "@/lib/db/client";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   const auth = await requireRoles(request, [
@@ -15,30 +15,23 @@ export async function GET(request: Request) {
   const requestedUserId = new URL(request.url).searchParams.get("userId");
 
   try {
-    const where =
-      auth.session.role === "ADMIN"
-        ? requestedUserId
-          ? { userId: requestedUserId }
-          : {}
-        : { userId: auth.session.userId };
+    const supabase = await createClient();
+    let query = supabase
+      .from("Subscription")
+      .select("id,userId,tier,status,currentPeriodEnd,paystackCustomerId,createdAt,updatedAt")
+      .order("createdAt", { ascending: false });
 
-    const subscriptions = await prisma.subscription.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        userId: true,
-        tier: true,
-        status: true,
-        currentPeriodEnd: true,
-        paystackCustomerId: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    if (auth.session.role === "ADMIN") {
+      if (requestedUserId) query = query.eq("userId", requestedUserId);
+    } else {
+      query = query.eq("userId", auth.session.userId);
+    }
+
+    const { data: subscriptions, error } = await query;
+    if (error) throw error;
 
     return NextResponse.json({
-      data: subscriptions,
+      data: subscriptions ?? [],
       accessScope: auth.session.role,
     });
   } catch {

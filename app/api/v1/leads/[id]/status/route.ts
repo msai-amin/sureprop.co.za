@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { ZodError, z } from "zod";
 import { badRequestFromZod } from "@/lib/api/validation";
 import { requireRoles } from "@/lib/auth/guards";
-import { prisma } from "@/lib/db/client";
 import { writeAuditEvent } from "@/lib/security/audit";
+import { createClient } from "@/lib/supabase/server";
 
 const updateLeadStatusSchema = z.object({
   status: z.enum([
@@ -26,12 +26,15 @@ export async function PATCH(
     const body = await request.json();
     const parsed = updateLeadStatusSchema.parse(body);
     const { id } = await context.params;
+    const supabase = await createClient();
 
-    const existing = await prisma.lead.findUnique({
-      where: { id },
-      select: { id: true, agentId: true, status: true },
-    });
+    const { data: existing, error: existingError } = await supabase
+      .from("Lead")
+      .select("id,agentId,status")
+      .eq("id", id)
+      .maybeSingle();
 
+    if (existingError) throw existingError;
     if (!existing) {
       return NextResponse.json(
         { error: "NotFound", message: "Lead not found." },
@@ -46,18 +49,14 @@ export async function PATCH(
       );
     }
 
-    const lead = await prisma.lead.update({
-      where: { id: existing.id },
-      data: { status: parsed.status },
-      select: {
-        id: true,
-        status: true,
-        updatedAt: true,
-        agentId: true,
-        buyerId: true,
-        propertyId: true,
-      },
-    });
+    const { data: lead, error: updateError } = await supabase
+      .from("Lead")
+      .update({ status: parsed.status })
+      .eq("id", existing.id)
+      .select("id,status,updatedAt,agentId,buyerId,propertyId")
+      .single();
+
+    if (updateError || !lead) throw updateError;
 
     await writeAuditEvent({
       actorUserId: auth.session.userId,

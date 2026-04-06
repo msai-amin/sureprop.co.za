@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { ZodError, z } from "zod";
 import { badRequestFromZod } from "@/lib/api/validation";
 import { requireRoles } from "@/lib/auth/guards";
-import { prisma } from "@/lib/db/client";
 import { writeAuditEvent } from "@/lib/security/audit";
 import { buildVaultStoragePath, getSignedDocumentUrl } from "@/lib/storage/vault";
+import { createClient } from "@/lib/supabase/server";
 
 const createDocumentSchema = z.object({
   userId: z.uuid().optional(),
@@ -27,28 +27,23 @@ export async function GET(request: Request) {
   const requestedUserId = url.searchParams.get("userId");
 
   try {
-    const where =
-      auth.session.role === "ADMIN"
-        ? requestedUserId
-          ? { userId: requestedUserId }
-          : {}
-        : { userId: auth.session.userId };
+    const supabase = await createClient();
+    let query = supabase
+      .from("Document")
+      .select("id,userId,type,storageUrl,isEncrypted,createdAt")
+      .order("createdAt", { ascending: false })
+      .limit(Number.isNaN(limit) ? 50 : limit);
 
-    const documents = await prisma.document.findMany({
-      where,
-      take: Number.isNaN(limit) ? 50 : limit,
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        userId: true,
-        type: true,
-        storageUrl: true,
-        isEncrypted: true,
-        createdAt: true,
-      },
-    });
+    if (auth.session.role === "ADMIN") {
+      if (requestedUserId) query = query.eq("userId", requestedUserId);
+    } else {
+      query = query.eq("userId", auth.session.userId);
+    }
 
-    return NextResponse.json({ data: documents, accessScope: auth.session.role });
+    const { data: documents, error } = await query;
+    if (error) throw error;
+
+    return NextResponse.json({ data: documents ?? [], accessScope: auth.session.role });
   } catch {
     return NextResponse.json(
       { error: "InternalError", message: "Failed to fetch documents." },
@@ -76,23 +71,20 @@ export async function POST(request: Request) {
         : auth.session.userId;
 
     const storageUrl = buildVaultStoragePath(ownerUserId, parsed.fileName);
+    const supabase = await createClient();
 
-    const document = await prisma.document.create({
-      data: {
+    const { data: document, error } = await supabase
+      .from("Document")
+      .insert({
         userId: ownerUserId,
         type: parsed.type,
         storageUrl,
         isEncrypted: true,
-      },
-      select: {
-        id: true,
-        userId: true,
-        type: true,
-        storageUrl: true,
-        isEncrypted: true,
-        createdAt: true,
-      },
-    });
+      })
+      .select("id,userId,type,storageUrl,isEncrypted,createdAt")
+      .single();
+
+    if (error || !document) throw error;
 
     await writeAuditEvent({
       actorUserId: auth.session.userId,
