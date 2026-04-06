@@ -18,6 +18,32 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 
+async function debugLog(
+  hypothesisId: string,
+  location: string,
+  message: string,
+  data: Record<string, unknown>,
+) {
+  // #region agent log
+  await fetch("http://127.0.0.1:7926/ingest/b9a7b057-6775-4a54-91be-9c9c36a216a5", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "0cf523",
+    },
+    body: JSON.stringify({
+      sessionId: "0cf523",
+      runId: "signin-debug-pre-fix",
+      hypothesisId,
+      location,
+      message,
+      data,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+}
+
 export function LoginForm() {
   const searchParams = useSearchParams();
   const queryError = searchParams.get("error");
@@ -31,12 +57,36 @@ export function LoginForm() {
     e.preventDefault();
     setError(null);
     setPending(true);
+    // #region agent log
+    await debugLog(
+      "H1",
+      "components/auth/login-form.tsx:onSubmit:start",
+      "login submit started",
+      {
+        hasEmail: email.length > 0,
+        hasPassword: password.length > 0,
+        hasNextParam: Boolean(searchParams.get("next")),
+      },
+    );
+    // #endregion
     try {
       const supabase = createClient();
       const { error: signError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+      // #region agent log
+      await debugLog(
+        "H1",
+        "components/auth/login-form.tsx:onSubmit:afterSignIn",
+        "signInWithPassword returned",
+        {
+          hasSignError: Boolean(signError),
+          signErrorName: signError?.name ?? null,
+          signErrorStatus: signError?.status ?? null,
+        },
+      );
+      // #endregion
       if (signError) {
         setError(signError.message);
         return;
@@ -45,6 +95,17 @@ export function LoginForm() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
+      // #region agent log
+      await debugLog(
+        "H2",
+        "components/auth/login-form.tsx:onSubmit:afterGetSession",
+        "getSession completed",
+        {
+          hasSession: Boolean(session),
+          sessionUserPresent: Boolean(session?.user),
+        },
+      );
+      // #endregion
       if (!session) {
         setError(
           "Signed in but the session was not stored. Try again or check browser cookie settings.",
@@ -54,13 +115,36 @@ export function LoginForm() {
 
       let sync: Response;
       try {
+        const syncStartedAt = Date.now();
         sync = await fetch("/api/auth/sync-user", {
           method: "POST",
           credentials: "same-origin",
           signal: AbortSignal.timeout(25_000),
         });
+        // #region agent log
+        await debugLog(
+          "H3",
+          "components/auth/login-form.tsx:onSubmit:afterSyncFetch",
+          "sync-user request finished",
+          {
+            syncOk: sync.ok,
+            syncStatus: sync.status,
+            syncDurationMs: Date.now() - syncStartedAt,
+          },
+        );
+        // #endregion
       } catch (err) {
         const name = err instanceof Error ? err.name : "";
+        // #region agent log
+        await debugLog(
+          "H3",
+          "components/auth/login-form.tsx:onSubmit:syncFetchError",
+          "sync-user request failed",
+          {
+            errorName: name || null,
+          },
+        );
+        // #endregion
         if (name === "TimeoutError" || name === "AbortError") {
           setError(
             "Profile sync timed out. Check your connection, then try again.",
@@ -80,6 +164,14 @@ export function LoginForm() {
         nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
           ? nextParam
           : "/";
+      // #region agent log
+      await debugLog(
+        "H5",
+        "components/auth/login-form.tsx:onSubmit:beforeNavigation",
+        "about to navigate after sign in",
+        { destination },
+      );
+      // #endregion
       window.location.assign(destination);
     } finally {
       setPending(false);

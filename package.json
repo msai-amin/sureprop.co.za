@@ -9,6 +9,7 @@
     "lint": "eslint",
     "check": "npm run lint && npx tsc --noEmit",
     "check:env": "node scripts/check-env.mjs",
+    "import:property24": "node scripts/import-property24.mjs",
     "deploy:vercel": "vercel deploy --prod --yes",
     "vercel:git:main": "vercel git connect https://github.com/msai-amin/sureprop.co.za.git"
   },
